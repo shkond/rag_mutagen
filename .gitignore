@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[co]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+
+# ChromaDB storage (重要！)
+storage/
+.chroma/
+*.duckdb
+*.parquet
+
+# LlamaIndex cache
+.llamaindex/
+
+# VS Code settings (個人設定のため)
+.vscode/
+cline_mcp_settings.json
+
+# Environment variables
+.env
+.env.local
+
+# Lock files (uvの場合は含めるべき)
+# uv.lock は含める（再現性のため）

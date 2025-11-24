@@ -1,0 +1,167 @@
+import asyncio
+import sys
+import shutil
+from pathlib import Path
+
+# Global MCP instance placeholder
+mcp = None
+
+# Patch chromadb.PersistentClient to avoid locking storage
+import sys
+from unittest.mock import MagicMock
+
+# We need to mock the PersistentClient class on the actual chromadb module
+# BEFORE importing server.py
+try:
+    import chromadb
+    chromadb.PersistentClient = MagicMock()
+except ImportError:
+    # If chromadb isn't installed in the test env (it should be), we can't patch it easily
+    # But since we are running with uv run, it should be there.
+    pass
+
+# Also need to mock llama_index components that use chromadb if they are imported at top level
+# server.py imports:
+# from llama_index.vector_stores.chroma import ChromaVectorStore
+# import chromadb
+# chroma_client = chromadb.PersistentClient(path=STORAGE_PATH)
+
+
+
+async def verify_tools():
+    """Verify that required tools are registered."""
+    try:
+        tools = await mcp._tool_manager.get_tools()
+        if isinstance(tools, dict):
+            tool_names = list(tools.keys())
+        else:
+            tool_names = [tool.name for tool in tools]
+        return tool_names
+    except AttributeError:
+        print("Could not list tools via _tool_manager.get_tools()")
+        sys.exit(1)
+
+def test_server_tools():
+    """
+    Verifies that the MCP server registers the expected tools.
+    """
+    print("Testing server import...")
+    try:
+        global mcp
+        from server import mcp
+        print("Server imported successfully.")
+    except ImportError as e:
+        print(f"Failed to import server: {e}")
+        sys.exit(1)
+
+    print("Verifying tools...")
+    tool_names = asyncio.run(verify_tools())
+    print(f"Found tools: {tool_names}")
+    
+    required_tools = ["refresh_index", "search_repository", "get_index_stats"]
+    missing = [t for t in required_tools if t not in tool_names]
+    
+    if missing:
+        print(f"Missing tools: {missing}")
+        sys.exit(1)
+        
+    print("All required tools are present.")
+
+def test_search_without_index_fails():
+    """Test that search returns a friendly error when index is missing."""
+    print("\nTesting search without index...")
+    
+    # We need to reload server or patch the client in it
+    # We need to reload server or patch the client in it
+    from server import mcp, chroma_client, search_repository
+    
+    # Mock get_collection to raise ValueError (simulating missing index)
+    chroma_client.get_collection.side_effect = ValueError("Collection not found")
+    
+    # Run async tool call
+    async def run_search():
+        # Try to get the tool and call it
+        # FastMCP 2.0 tool wrapper usually has 'fn' or is callable via 'run'
+        # Let's try to access the original function
+        tool_func = search_repository
+        if hasattr(tool_func, "fn"):
+            # It's likely a FastMCP wrapper
+            return tool_func.fn("test query")
+        elif hasattr(tool_func, "run"):
+             return await tool_func.run(query="test query")
+        else:
+            # Maybe it's just the function if FastMCP didn't wrap it in a class?
+            # But previous error said 'FunctionTool' object is not callable.
+            # Let's try accessing via tool manager
+            tools = await mcp._tool_manager.get_tools()
+            if isinstance(tools, dict):
+                tool = tools["search_repository"]
+            else:
+                tool = next(t for t in tools if t.name == "search_repository")
+            
+            # If tool is a Tool object, it might have 'run'
+            if hasattr(tool, "run"):
+                return await tool.run(query="test query")
+            elif hasattr(tool, "fn"):
+                return tool.fn("test query")
+            else:
+                return f"Could not call tool: {type(tool)}"
+
+    result = asyncio.run(run_search())
+    print(f"Result: {result}")
+    
+    # Check for the expected error message
+    # Result might be a list of content or a text string depending on FastMCP version
+    # If it's a CallToolResult, it has content list.
+    str_result = str(result)
+    assert "Index does not exist" in str_result or "インデックスが存在しません" in str_result
+    print("Pass: Correct error message received.")
+
+def test_generated_file_detection():
+    """Test the is_generated_file logic directly."""
+    print("\nTesting generated file detection...")
+    from server import is_generated_file
+    
+    # Create dummy files
+    test_dir = Path("test_files")
+    test_dir.mkdir(exist_ok=True)
+    
+    try:
+        # Case 1: Generated extension (content doesn't matter)
+        (test_dir / "MyClass.g.cs").touch()
+        
+        # Case 2: Generated directory (content doesn't matter)
+        (test_dir / "Generated").mkdir(exist_ok=True)
+        (test_dir / "Generated" / "MyClass.cs").touch()
+        
+        # Case 3: Header tag
+        with open(test_dir / "HeaderGen.cs", "w") as f:
+            f.write("// <auto-generated />\npublic class Foo {}")
+            
+        # Case 4: Normal file
+        with open(test_dir / "Normal.cs", "w") as f:
+            f.write("public class Foo {}")
+
+        test_cases = [
+            (str(test_dir / "MyClass.g.cs"), True),
+            (str(test_dir / "Generated" / "MyClass.cs"), True),
+            (str(test_dir / "HeaderGen.cs"), True),
+            (str(test_dir / "Normal.cs"), False),
+        ]
+        
+        for path, expected in test_cases:
+            result = is_generated_file(path)
+            if result != expected:
+                print(f"Fail: {path} expected {expected}, got {result}")
+                sys.exit(1)
+        print("Pass: File detection logic works.")
+        
+    finally:
+        if test_dir.exists():
+            shutil.rmtree(test_dir)
+
+if __name__ == "__main__":
+    test_server_tools()
+    test_generated_file_detection()
+    test_search_without_index_fails()
+    print("\nAll tests passed!")

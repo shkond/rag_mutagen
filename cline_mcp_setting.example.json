@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "mutagen-rag": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "/path/to/your/mutagen_rag",
+                "run",
+                "server.py"
+            ]
+        }
+    }
+}
