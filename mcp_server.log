@@ -1,0 +1,263 @@
+2025-11-25 02:13:15,500 WARNING __main__: Cannot open log file C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log: [Errno 13] Permission denied: 'C:\\\\Users\\\\kondo\\\\Desktop\\\\mutagen_rag\\\\mcp_server.log'. Continuing with stderr only.
+C:\Users\kondo\Desktop\mutagen_rag\server.py:74: DeprecationWarning: The 'dependencies' parameter is deprecated as of FastMCP 2.11.4 and will be removed in a future version. Please specify dependencies in a fastmcp.json configuration file instead:
+{
+  "entrypoint": "your_server.py",
+  "environment": {
+    "dependencies": ["fastmcp", "llama-index", "chromadb"]
+  }
+}
+See https://gofastmcp.com/docs/deployment/server-configuration for more information.
+  mcp = FastMCP("Mutagen Helper", dependencies=["fastmcp", "llama-index", "chromadb"])
+2025-11-25 02:13:15,629 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 02:13:19,067 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 02:13:19,089 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 02:13:19,171 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 02:13:19,171 INFO mutagen-rag: Using batch size: 2500
+
+
++-----------------------------------------------------------------------------+
+|                                                                             |
+|                        \u2584\u2580\u2580 \u2584\u2580\u2588 \u2588\u2580\u2580 \u2580\u2588\u2580 \u2588\u2580\u2584\u2580\u2588 \u2588\u2580\u2580 \u2588\u2580\u2588                        |
+|                        \u2588\u2580  \u2588\u2580\u2588 \u2584\u2584\u2588  \u2588  \u2588 \u2580 \u2588 \u2588\u2584\u2584 \u2588\u2580\u2580                        |
+|                                                                             |
+|                               FastMCP 2.13.1                                |
+|                                                                             |
+|                                                                             |
+|                    \U0001f5a5  Server name: Mutagen Helper                           |
+|                                                                             |
+|                    \U0001f4e6 Transport:   STDIO                                    |
+|                                                                             |
+|                    \U0001f4da Docs:        https://gofastmcp.com                    |
+|                    \U0001f680 Hosting:     https://fastmcp.cloud                    |
+|                                                                             |
++-----------------------------------------------------------------------------+
+
+
+[11/25/25 02:13:19] INFO     Starting MCP server 'Mutagen        server.py:1971
+                             Helper' with transport 'stdio'                    
+2025-11-25 02:23:01,543 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 02:23:01,677 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 02:23:05,073 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 02:23:05,095 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 02:23:05,177 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 02:23:05,177 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 13:21:42,109 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 13:21:42,303 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 13:21:45,595 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 13:21:45,630 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 13:21:45,835 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 13:21:45,835 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 13:45:59,595 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 13:45:59,795 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 13:56:49,890 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 13:56:50,102 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 13:56:53,357 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 13:56:53,381 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 13:56:53,498 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 13:56:53,498 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 14:01:38,803 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 14:01:38,932 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 14:01:42,176 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 14:01:42,198 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 14:01:42,278 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 14:01:42,278 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 14:01:54,983 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 14:01:55,263 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 14:01:56,025 INFO mutagen-rag: KeyboardInterrupt received, shutting down MCP server.
+2025-11-25 14:03:57,384 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 14:03:57,533 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 14:04:00,672 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 14:04:00,694 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 14:04:00,777 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 14:04:00,778 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 14:09:49,607 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 14:09:49,738 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 14:09:53,319 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 14:09:53,341 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 14:09:53,420 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 14:09:53,420 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 14:09:53,443 INFO mcp.server.lowlevel.server: Processing request of type ListPromptsRequest
+2025-11-25 14:09:53,444 INFO mcp.server.lowlevel.server: Processing request of type ListToolsRequest
+2025-11-25 14:12:30,792 INFO mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2025-11-25 14:12:30,793 INFO mutagen-rag: Scanning repository at: c:/Users/kondo/Desktop/mutagen_rag
+2025-11-25 14:12:37,289 INFO mutagen-rag: Loaded 6244 documents. Filtering generated files...
+2025-11-25 14:12:38,073 INFO mutagen-rag: Filtered down to 6244 documents. Excluded 0 generated files.
+2025-11-25 14:13:21,686 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 14:13:22,693 ERROR mcp.server.lowlevel.server: Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: EOF while parsing a value at line 2 column 0 [type=json_invalid, input_value='\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
+2025-11-25 14:41:54,759 INFO __main__: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 14:41:54,891 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 14:41:58,181 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 14:41:58,204 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 14:41:58,287 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 14:41:58,288 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 14:41:58,309 INFO mcp.server.lowlevel.server: Processing request of type ListPromptsRequest
+2025-11-25 14:41:58,310 INFO mcp.server.lowlevel.server: Processing request of type ListToolsRequest
+2025-11-25 14:42:28,226 INFO mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2025-11-25 14:42:28,226 INFO mutagen-rag: Scanning repository at: C:/Users/kondo/Desktop/mutagen_rag/Mutagen/Mutagen.Bethesda.Core
+2025-11-25 14:42:28,496 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 14:42:28,558 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:01:54,975 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:01:55,125 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:01:58,407 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:01:58,430 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:01:58,514 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:01:58,514 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:01:58,518 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:01:58,817 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:01:58,885 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:02:00,192 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:02:00,198 ERROR mutagen-rag: Search failed: max() iterable argument is empty
+2025-11-25 15:04:25,462 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:04:25,606 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:04:28,736 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:04:28,760 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:04:28,843 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:04:28,843 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:04:28,847 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:04:29,118 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:04:29,184 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:05:54,607 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:05:54,611 ERROR mutagen-rag: Search failed: max() iterable argument is empty
+2025-11-25 15:07:09,722 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:07:09,855 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:07:13,142 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:07:13,164 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:07:13,247 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:07:13,247 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:07:13,251 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:07:13,535 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:07:13,599 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:08:39,247 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:08:39,249 INFO mutagen-rag: Building BM25 index from 0 nodes...
+2025-11-25 15:08:39,249 WARNING mutagen-rag: No nodes found in docstore for BM25.
+2025-11-25 15:08:39,250 WARNING mutagen-rag: Falling back to Vector Search only.
+2025-11-25 15:08:39,753 WARNING huggingface_hub.file_download: Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+2025-11-25 15:08:54,754 WARNING huggingface_hub.file_download: Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+2025-11-25 15:08:55,236 WARNING huggingface_hub.file_download: Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+2025-11-25 15:08:58,925 ERROR mutagen-rag: Search failed: 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******
+2025-11-25 15:12:31,663 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:12:31,803 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:12:34,988 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:12:35,011 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:12:35,090 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:12:35,090 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:12:35,094 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:12:35,383 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:12:35,447 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:14:01,699 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:14:01,701 INFO mutagen-rag: Docstore empty, fetching nodes from ChromaDB for BM25...
+2025-11-25 15:14:03,602 INFO mutagen-rag: Building BM25 index from 20164 nodes...
+2025-11-25 15:14:11,785 ERROR mutagen-rag: Search failed: 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******
+2025-11-25 15:14:59,717 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:14:59,857 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:15:03,366 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:15:03,389 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:15:03,473 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:15:03,474 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:15:03,477 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:15:03,753 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:15:03,815 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:16:30,627 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:16:30,629 INFO mutagen-rag: Docstore empty, fetching nodes from ChromaDB for BM25...
+2025-11-25 15:16:32,814 INFO mutagen-rag: Building BM25 index from 20959 nodes...
+2025-11-25 15:16:41,544 ERROR mutagen-rag: Search failed: 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******
+2025-11-25 15:18:26,607 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:18:26,751 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:18:30,925 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:18:30,947 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:18:31,032 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:18:31,032 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:18:31,036 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:18:31,332 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:18:31,397 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:19:58,966 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:19:58,969 INFO mutagen-rag: Docstore empty, fetching nodes from ChromaDB for BM25...
+2025-11-25 15:20:01,266 INFO mutagen-rag: Building BM25 index from 21754 nodes...
+2025-11-25 15:20:10,634 ERROR mutagen-rag: Search failed: 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******
+2025-11-25 15:20:55,837 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:20:55,991 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:20:59,465 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:20:59,493 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:20:59,604 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:20:59,604 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:20:59,609 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:20:59,930 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:21:00,003 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:22:26,955 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:22:26,957 INFO mutagen-rag: Docstore empty, fetching nodes from ChromaDB for BM25...
+2025-11-25 15:22:29,286 INFO mutagen-rag: Building BM25 index from 22549 nodes...
+2025-11-25 15:22:39,066 WARNING mutagen-rag: Query failed (likely missing LLM): 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******. Returning retrieval results only.
+2025-11-25 15:22:39,116 ERROR mutagen-rag: Search failed: cannot access local variable 'reranker' where it is not associated with a value
+2025-11-25 15:23:20,071 INFO server: Logging initialized to C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log
+2025-11-25 15:23:20,209 INFO sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-25 15:23:23,304 INFO sentence_transformers.SentenceTransformer: 1 prompt is loaded, with the key: query
+2025-11-25 15:23:23,326 INFO chromadb.telemetry.product.posthog: Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-11-25 15:23:23,409 INFO mutagen-rag: ChromaDB max_batch_size: Unknown
+2025-11-25 15:23:23,409 INFO mutagen-rag: Using batch size: 2500
+2025-11-25 15:23:23,413 INFO mutagen-rag: Scanning repository at: ./Mutagen/Mutagen.Bethesda.Core
+2025-11-25 15:23:23,688 INFO mutagen-rag: Loaded 510 documents. Filtering generated files...
+2025-11-25 15:23:23,750 INFO mutagen-rag: Filtered down to 510 documents. Excluded 0 generated files.
+2025-11-25 15:24:51,341 INFO llama_index.core.indices.loading: Loading all indices.
+2025-11-25 15:24:51,343 INFO mutagen-rag: Docstore empty, fetching nodes from ChromaDB for BM25...
+2025-11-25 15:24:53,658 INFO mutagen-rag: Building BM25 index from 23344 nodes...
+2025-11-25 15:25:03,875 WARNING mutagen-rag: Query failed (likely missing LLM): 
+******
+Could not load OpenAI model. If you intended to use OpenAI, please check your OPENAI_API_KEY.
+Original error:
+No API key found for OpenAI.
+Please set either the OPENAI_API_KEY environment variable or openai.api_key prior to initialization.
+API keys can be found or created at https://platform.openai.com/account/api-keys
+
+******. Returning retrieval results only.

@@ -6,9 +6,11 @@ Bethesda系ゲームのModdingライブラリ「Mutagen」のためのRAG（検�
 ## 機能
 
 - **スマートフィルタリング**: 自動生成ファイル（`.g.cs`, `obj/`, `Generated/`など）をインデックスから除外
-- **ローカルRAG**: ChromaDBとローカル埋め込みモデル（BAAI/bge-small-en-v1.5）を使用し、外部APIコストゼロで動作
-- **安全性**: 大規模リポジトリでもクラッシュしないよう、バッチサイズを動的に調整
-- **高精度検索**: `refine`モードを使用した、コード検索に特化した回答生成
+- **ハイブリッド検索**: BM25（キーワード検索）とベクトル検索を組み合わせ、コード特有の識別子と意味的な検索の両方に対応
+- **リランキング**: BAAI/bge-reranker-baseを使用して検索結果を再評価し、トップレベルの精度を実現
+- **C#最適化**: チャンクサイズを2048に拡張し、クラス定義全体を保持。名前空間や型名のメタデータ抽出も実装
+- **ローカルRAG**: ChromaDBとローカルモデルを使用し、外部APIコストゼロで動作（LLMによる回答生成を除く）
+- **堅牢性**: LLM（OpenAI）未設定時やBM25失敗時でも、ベクトル検索へ自動フォールバックして結果を返却
 
 ## 前提条件
 
@@ -56,7 +58,8 @@ ClineなどのMCPクライアントから使用するための設定です。
       "args": ["run", "server.py"],
       "cwd": "c:/path/to/mutagen_rag", 
       "env": {
-        "MUTAGEN_REPO_PATH": "c:/path/to/Mutagen/Mutagen.Bethesda.Core"
+        "MUTAGEN_REPO_PATH": "c:/path/to/Mutagen/Mutagen.Bethesda.Core",
+        "OPENAI_API_KEY": "sk-..." 
       }
     }
   }
@@ -64,6 +67,7 @@ ClineなどのMCPクライアントから使用するための設定です。
 ```
 ※ `cwd` はこのリポジトリの絶対パスに書き換えてください。
 ※ `MUTAGEN_REPO_PATH` は、方法Aの場合は省略可能です（デフォルトで `./Mutagen/Mutagen.Bethesda.Core` を探します）。
+※ `OPENAI_API_KEY` は、`refine` モード（AIによる回答生成）を使用する場合に必要です。設定しない場合は、検索結果のリストのみが返されます。
 
 ## 使い方
 

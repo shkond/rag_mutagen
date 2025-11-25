@@ -11,6 +11,8 @@ dependencies = [
     "llama-index-embeddings-huggingface>=0.2.0",
     "chromadb>=0.4.0",
     "fastmcp>=2.13.1",
+    "llama-index-retrievers-bm25>=0.6.5",
+    "rank-bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]

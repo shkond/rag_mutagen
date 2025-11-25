@@ -2,6 +2,7 @@ import os
 import logging
 from pathlib import Path
 from typing import List
+import asyncio
 
 from fastmcp import FastMCP
 from llama_index.core import (
@@ -9,19 +10,65 @@ from llama_index.core import (
     VectorStoreIndex,
     StorageContext,
     Settings,
+    Settings,
     load_index_from_storage,
 )
+from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
+import re
+from llama_index.retrievers.bm25 import BM25Retriever
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.postprocessor import SentenceTransformerRerank
+from llama_index.core import QueryBundle
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# 追加: ログを stderr とファイルに出す設定（stdio を汚染しないように）
+import os
+import sys
+import logging
+from logging.handlers import RotatingFileHandler
+
+# server.py に追加（ファイル先を Desktop に固定）
+import os
+import sys
+import logging
+from logging.handlers import RotatingFileHandler
+ # 例: server.py の logging 初期化のすぐ後に追加
 logger = logging.getLogger("mutagen-rag")
+LOG_FILE = r"C:\\Users\\kondo\\Desktop\\mutagen_rag\\mcp_server.log"
+
+def setup_logging_desktop():
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    stderr_handler = logging.StreamHandler(stream=sys.stderr)
+    stderr_handler.setFormatter(formatter)
+    stderr_handler.setLevel(logging.INFO)
+   
+    root = logging.getLogger()
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+    root.addHandler(stderr_handler)
+    root.setLevel(logging.INFO)
+
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        # 書き込みテスト
+        with open(LOG_FILE, "a", encoding="utf-8"):
+            pass
+        file_handler = RotatingFileHandler(LOG_FILE, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.INFO)
+        root.addHandler(file_handler)
+        logging.getLogger(__name__).info("Logging initialized to %s", LOG_FILE)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Cannot open log file %s: %s. Continuing with stderr only.", LOG_FILE, e)
+
+setup_logging_desktop()
 
 # Configuration
-# Set chunk size to 512 to avoid ChromaDB batch size limits (max 5461)
-Settings.chunk_size = 512
+# Set chunk size to 2048 and overlap to 200 for better code context
+Settings.chunk_size = 2048
+Settings.chunk_overlap = 200
 
 # Get Mutagen repository path from environment variable or default
 MUTAGEN_REPO_PATH = os.getenv(
@@ -94,6 +141,32 @@ def is_generated_file(file_path: str) -> bool:
         
     return False
 
+def extract_metadata(file_path: str, content: str) -> dict:
+    """
+    Extracts C# specific metadata (namespace, class, etc.)
+    """
+    metadata = {}
+    
+    # Extract Namespace
+    namespace_match = re.search(r'namespace\s+([\w\.]+)', content)
+    if namespace_match:
+        metadata["namespace"] = namespace_match.group(1)
+        
+    # Extract Class/Interface/Struct names
+    # This is a simplified regex and might capture multiple if defined in one file
+    types = []
+    for match in re.finditer(r'(class|interface|struct|enum|record)\s+([\w]+)', content):
+        types.append(f"{match.group(1)}:{match.group(2)}")
+    
+    if types:
+        # Limit the number of types to avoid metadata overflow
+        joined_types = ", ".join(types)
+        if len(joined_types) > 500:
+            joined_types = joined_types[:497] + "..."
+        metadata["defined_types"] = joined_types
+        
+    return metadata
+
 @mcp.tool()
 def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
     """
@@ -143,6 +216,11 @@ def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
     for doc in filtered_docs:
         doc.metadata["source"] = "mutagen_handwritten"
         doc.metadata["indexed_at"] = str(Path(doc.metadata["file_path"]).stat().st_mtime)
+        # Extract additional C# metadata
+        try:
+            doc.metadata.update(extract_metadata(doc.metadata["file_path"], doc.text))
+        except Exception as e:
+            logger.warning(f"Failed to extract metadata for {doc.metadata['file_path']}: {e}")
 
     # Initialize ChromaDB Collection
     chroma_collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
@@ -194,19 +272,106 @@ def search_repository(query: str, top_k: int = 5) -> str:
         
         # Query Engine
         # Using "refine" as requested for better code retrieval accuracy
-        query_engine = index.as_query_engine(
-            similarity_top_k=top_k,
-            response_mode="refine" 
+        # Query Engine Construction with Hybrid Search and Reranking
+        
+        # 1. BM25 Retriever (Sparse)
+        # We construct it from the docstore of the loaded index
+        # Note: This builds the BM25 index in memory, which is fast for <5k files
+        retriever_bm25 = None
+        try:
+            nodes = list(index.docstore.docs.values())
+            if not nodes:
+                logger.info("Docstore empty, fetching nodes from ChromaDB for BM25...")
+                data = chroma_collection.get()
+                if data and data['documents']:
+                    for i, text in enumerate(data['documents']):
+                        # Reconstruct TextNode
+                        # Note: We might lose some node attributes not stored in metadata/text
+                        # but it's enough for BM25
+                        node = TextNode(
+                            text=text, 
+                            id_=data['ids'][i], 
+                            metadata=data['metadatas'][i] if data['metadatas'] else {}
+                        )
+                        nodes.append(node)
+            
+            logger.info(f"Building BM25 index from {len(nodes)} nodes...")
+            if nodes:
+                retriever_bm25 = BM25Retriever.from_defaults(
+                    nodes=nodes,
+                    similarity_top_k=top_k * 3 # Fetch more candidates for fusion
+                )
+            else:
+                logger.warning("No nodes found for BM25.")
+        except Exception as e:
+            logger.error(f"Failed to initialize BM25Retriever: {e}")
+
+        # 2. Vector Retriever (Dense)
+        retriever_vector = index.as_retriever(
+            similarity_top_k=top_k * 3
         )
-        response = query_engine.query(query)
         
-        # Append source files
-        sources = "\n".join([
-            f"- {node.metadata.get('file_path', 'Unknown')}"
-            for node in response.source_nodes
-        ])
+        # 3. Hybrid Fusion & Query Engine
+        reranker = None
+        try:
+            final_retriever = retriever_vector # Default to vector if hybrid fails
+            
+            if retriever_bm25:
+                # Combines results from both retrievers
+                # Note: This might fail if LLM is missing (default OpenAI)
+                retriever_fusion = QueryFusionRetriever(
+                    [retriever_vector, retriever_bm25],
+                    similarity_top_k=top_k * 2, # Candidates for reranking
+                    num_queries=1,
+                    mode="reciprocal_rank",
+                    use_async=False,
+                    verbose=True
+                )
+                final_retriever = retriever_fusion
+            else:
+                logger.warning("Falling back to Vector Search only (BM25 missing).")
+            
+            # 4. Reranker
+            # Re-scores the fused results to find the absolute best matches
+            reranker = SentenceTransformerRerank(
+                model="BAAI/bge-reranker-base",
+                top_n=top_k
+            )
+
+            # 5. Query Engine
+            query_engine = index.as_query_engine(
+                retriever=final_retriever,
+                node_postprocessors=[reranker],
+                response_mode="refine" 
+            )
+            response = query_engine.query(query)
+            response_text = str(response)
+            source_nodes = response.source_nodes
+        except Exception as e:
+            # Fallback if LLM is not configured
+            logger.warning(f"Query failed (likely missing LLM): {e}. Returning retrieval results only.")
+            # Use vector retriever directly as safe fallback to avoid QueryFusionRetriever LLM dependency
+            source_nodes = retriever_vector.retrieve(query)
+            # Apply reranker manually if we fell back to retriever
+            if reranker:
+                source_nodes = reranker.postprocess_nodes(source_nodes, query_bundle=QueryBundle(query))
+            response_text = "⚠️ LLM not configured or failed. Showing retrieved documents only."
         
-        return f"{response}\n\n📂 Source Files:\n{sources}"
+        # Append source files with more details
+        sources_list = []
+        for node in source_nodes:
+            # Handle NodeWithScore or TextNode
+            # If it's NodeWithScore, get node
+            n = node.node if hasattr(node, 'node') else node
+            score = f"{node.score:.4f}" if hasattr(node, 'score') and node.score is not None else "N/A"
+            
+            file_path = n.metadata.get('file_path', 'Unknown')
+            types = n.metadata.get('defined_types', '')
+            sources_list.append(f"- {file_path} (Score: {score}) {f'[{types}]' if types else ''}")
+            
+        sources = "\n".join(sources_list)
+        
+        return f"{response_text}\n\n📂 Source Files:\n{sources}"
         
     except Exception as e:
         logger.error(f"Search failed: {e}")
@@ -223,4 +388,11 @@ def get_index_stats() -> str:
         return f"Failed to get stats: {str(e)}"
 
 if __name__ == "__main__":
-    mcp.run()
+    try:
+        mcp.run()
+    except asyncio.CancelledError:
+        logger.info("Shutdown requested (CancelledError). Exiting cleanly.")
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received, shutting down MCP server.")
+    except Exception as e:
+        logger.exception("MCP server terminated with exception: %s", e)
