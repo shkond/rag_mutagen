@@ -22,7 +22,8 @@ storage/
 # VS Code settings (個人設定のため)
 .vscode/
 cline_mcp_settings.json
-
+mutagen_rag.code-workspace
+mcp_server.log
 # Environment variables
 .env
 .env.local
