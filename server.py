@@ -36,7 +36,7 @@ import logging
 from logging.handlers import RotatingFileHandler
  # 例: server.py の logging 初期化のすぐ後に追加
 logger = logging.getLogger("mutagen-rag")
-
+LOG_FILE = os.getenv("MCP_LOG_FILE", str(REPO_ROOT / "mcp_server.log"))
 
 def setup_logging_desktop():
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
