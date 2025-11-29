@@ -1,238 +1,98 @@
-import os
-import logging
-from pathlib import Path
-from typing import List
+"""
+Mutagen RAG MCP Server
+
+Provides semantic code search over the Mutagen codebase using:
+- Vector search (dense retrieval) with BAAI/bge-small-en-v1.5
+- BM25 (sparse retrieval) for keyword matching
+- Hybrid fusion and reranking for optimal results
+
+Refactored for improved maintainability and testability.
+"""
 import asyncio
 
 from fastmcp import FastMCP
-from llama_index.core import (
-    SimpleDirectoryReader,
-    VectorStoreIndex,
-    StorageContext,
-    Settings,
-    Settings,
-    load_index_from_storage,
-)
-from llama_index.core.schema import TextNode
-from llama_index.core.node_parser import CodeSplitter
+from llama_index.core import Settings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
-import re
-from llama_index.retrievers.bm25 import BM25Retriever
-from llama_index.core.retrievers import QueryFusionRetriever
-from llama_index.core.postprocessor import SentenceTransformerRerank
-from llama_index.core import QueryBundle
 
-# 追加: ログを stderr とファイルに出す設定（stdio を汚染しないように）
-import os
-import sys
-import logging
-from logging.handlers import RotatingFileHandler
+# Import refactored modules
+from config import (
+    MUTAGEN_REPO_PATH,
+    STORAGE_PATH,
+    COLLECTION_NAME,
+    EMBEDDING_MODEL_NAME,
+    CHUNK_LINES,
+    CHUNK_OVERLAP_LINES,
+    MAX_CHARS
+)
+from logging_config import setup_logging, get_logger
+from index_manager import IndexManager
+from search_engine import HybridSearchEngine
 
-# server.py に追加（ファイル先を Desktop に固定）
-import os
-import sys
-import logging
-from logging.handlers import RotatingFileHandler
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
-# ワークスペース直下（このファイルが存在するフォルダ）をルートにする
-REPO_ROOT = Path(__file__).resolve().parent
-# ロガー初期化
-logger = logging.getLogger("mutagen-rag")
-LOG_FILE = os.getenv("MCP_LOG_FILE", str(REPO_ROOT / "mcp_server.log"))
+# ============================================================================
+# Code Splitter Configuration
+# ============================================================================
 
-def setup_logging_desktop():
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    stderr_handler = logging.StreamHandler(stream=sys.stderr)
-    stderr_handler.setFormatter(formatter)
-    stderr_handler.setLevel(logging.INFO)
-   
-    root = logging.getLogger()
-    for h in root.handlers[:]:
-        root.removeHandler(h)
-    root.addHandler(stderr_handler)
-    root.setLevel(logging.INFO)
-
-    try:
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-        # 書き込みテスト
-        with open(LOG_FILE, "a", encoding="utf-8"):
-            pass
-        file_handler = RotatingFileHandler(LOG_FILE, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8")
-        file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.INFO)
-        root.addHandler(file_handler)
-        logging.getLogger(__name__).info("Logging initialized to %s", LOG_FILE)
-    except Exception as e:
-        logging.getLogger(__name__).warning("Cannot open log file %s: %s. Continuing with stderr only.", LOG_FILE, e)
-
-setup_logging_desktop()
-
-# Configuration
-# Code splitter for C# - chunk by semantic code blocks rather than tokens
+# Try to use CodeSplitter for C#-aware chunking
 # Falls back to default splitting if tree-sitter is unavailable
 try:
     from llama_index.core.node_parser import CodeSplitter
+    
     code_splitter = CodeSplitter(
         language="c_sharp",
-        chunk_lines=40,  # Roughly 40 lines per chunk
-        chunk_lines_overlap=15,  # Overlap to maintain context
-        max_chars=2048,  # Safety limit
+        chunk_lines=CHUNK_LINES,
+        chunk_lines_overlap=CHUNK_OVERLAP_LINES,
+        max_chars=MAX_CHARS,
     )
     transformations_list = [code_splitter]
-    logger.info("CodeSplitter (C#) initialized successfully.")
+    logger.info("CodeSplitter (C#) initialized successfully")
 except ImportError as e:
-    logger.warning(f"Tree-sitter or CodeSplitter not available: {e}. Falling back to default splitting.")
+    logger.warning(
+        f"Tree-sitter or CodeSplitter not available: {e}. "
+        "Falling back to default splitting."
+    )
     transformations_list = []  # Use default LlamaIndex splitting
 
-# Get Mutagen repository path from environment variable or default
-MUTAGEN_REPO_PATH = os.getenv(
-    "MUTAGEN_REPO_PATH",
-    "./Mutagen/Mutagen.Bethesda.Core"
+# ============================================================================
+# Initialize Components
+# ============================================================================
+
+# Initialize FastMCP server
+mcp = FastMCP(
+    "Mutagen Helper",
+    dependencies=["fastmcp", "llama-index", "chromadb"]
 )
-STORAGE_PATH = "./storage"
-COLLECTION_NAME = "mutagen_handwritten_code"
 
-# BM25 Retriever Cache (cleared on refresh_index)
-_CACHED_BM25_RETRIEVER = None
+# Initialize embedding model
+embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL_NAME)
 
-# Initialize FastMCP
-# Dependencies list is for metadata, actual imports are handled by python environment
-mcp = FastMCP("Mutagen Helper", dependencies=["fastmcp", "llama-index", "chromadb"])
-
-# Initialize Embedding Model
-# Using a small, efficient model suitable for local use
-embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-
-# Initialize ChromaDB Client (Persistent)
+# Initialize ChromaDB client (persistent)
 chroma_client = chromadb.PersistentClient(path=STORAGE_PATH)
 
-# Dynamic batch size calculation
-try:
-    # ChromaDB 0.4+ might have max_batch_size
-    max_batch = getattr(chroma_client, "max_batch_size", 5000)
-    SAFE_BATCH_SIZE = min(5000, max_batch // 2)
-except Exception:
-    SAFE_BATCH_SIZE = 2000 # Fallback
+# Initialize index manager
+index_manager = IndexManager(
+    chroma_client=chroma_client,
+    embed_model=embed_model,
+    transformations_list=transformations_list,
+    storage_path=STORAGE_PATH,
+    collection_name=COLLECTION_NAME
+)
 
-logger.info(f"ChromaDB max_batch_size: {getattr(chroma_client, 'max_batch_size', 'Unknown')}")
-logger.info(f"Using batch size: {SAFE_BATCH_SIZE}")
+# Initialize search engine
+search_engine = HybridSearchEngine(
+    chroma_client=chroma_client,
+    embed_model=embed_model,
+    storage_path=STORAGE_PATH,
+    collection_name=COLLECTION_NAME
+)
 
-def is_generated_file_fast(file_path: Path) -> bool:
-    """
-    Fast path-based filtering without file I/O.
-    Checks file extensions and directory names only.
-    """
-    path_str = str(file_path)
-    
-    # 1. File name patterns
-    generated_suffixes = [".g.cs", ".Autogen.cs", ".Generated.cs"]
-    if any(path_str.endswith(suffix) for suffix in generated_suffixes):
-        return True
-    
-    # 2. Directory names
-    excluded_dirs = ["Generated", "obj", "bin", ".vs", "Autogenerated"]
-    if any(excluded_dir in file_path.parts for excluded_dir in excluded_dirs):
-        return True
-        
-    return False
-
-def is_header_generated(text: str) -> bool:
-    """
-    Check if file content has auto-generated markers.
-    This is the slow check that reads file content.
-    """
-    # Only check first 1000 chars for performance
-    header = text[:1000]
-    generated_markers = [
-        "<auto-generated>",
-        "This code was generated",
-        "// <auto-generated />",
-        "Auto-generated code"
-    ]
-    return any(marker in header for marker in generated_markers)
-
-def extract_metadata(file_path: str, content: str) -> dict:
-    """
-    Extracts C# specific metadata (namespace, class, method names, etc.)
-    """
-    metadata = {}
-    
-    # Extract Namespace
-    namespace_match = re.search(r'namespace\s+([\w\.]+)', content)
-    if namespace_match:
-        metadata["namespace"] = namespace_match.group(1)
-        
-    # Extract Class/Interface/Struct names
-    # This is a simplified regex and might capture multiple if defined in one file
-    types = []
-    for match in re.finditer(r'(class|interface|struct|enum|record)\s+([\w]+)', content):
-        types.append(f"{match.group(1)}:{match.group(2)}")
-    
-    if types:
-        # Limit the number of types to avoid metadata overflow
-        joined_types = ", ".join(types)
-        if len(joined_types) > 500:
-            joined_types = joined_types[:497] + "..."
-        metadata["defined_types"] = joined_types
-    
-    # Extract Method Names (public methods for BM25 keyword matching)
-    # Pattern matches: public [modifiers] ReturnType MethodName(
-    method_pattern = r'public\s+(?:static\s+|virtual\s+|override\s+|async\s+)?[\w<>\[\]]+\s+([\w]+)\s*\('
-    methods = re.findall(method_pattern, content)
-    
-    if methods:
-        # Remove duplicates and limit size to avoid metadata overflow
-        unique_methods = list(set(methods))
-        joined_methods = ", ".join(unique_methods)
-        if len(joined_methods) > 500:
-            joined_methods = joined_methods[:497] + "..."
-        metadata["methods"] = joined_methods
-        
-    return metadata
-
-def get_bm25_retriever(index, chroma_collection, top_k: int):
-    """
-    Get or build BM25 retriever with caching.
-    Cached retriever is reused across searches until index is refreshed.
-    """
-    global _CACHED_BM25_RETRIEVER
-    
-    if _CACHED_BM25_RETRIEVER is not None:
-        logger.info("Using cached BM25 retriever")
-        return _CACHED_BM25_RETRIEVER
-    
-    # Build BM25 retriever
-    logger.info("Building new BM25 retriever...")
-    try:
-        nodes = list(index.docstore.docs.values())
-        if not nodes:
-            logger.info("Docstore empty, fetching nodes from ChromaDB for BM25...")
-            data = chroma_collection.get()
-            if data and data['documents']:
-                for i, text in enumerate(data['documents']):
-                    node = TextNode(
-                        text=text, 
-                        id_=data['ids'][i], 
-                        metadata=data['metadatas'][i] if data['metadatas'] else {}
-                    )
-                    nodes.append(node)
-        
-        logger.info(f"Building BM25 index from {len(nodes)} nodes...")
-        if nodes:
-            _CACHED_BM25_RETRIEVER = BM25Retriever.from_defaults(
-                nodes=nodes,
-                similarity_top_k=top_k * 3
-            )
-            logger.info("BM25 retriever cached successfully")
-            return _CACHED_BM25_RETRIEVER
-        else:
-            logger.warning("No nodes found for BM25.")
-            return None
-    except Exception as e:
-        logger.error(f"Failed to initialize BM25Retriever: {e}")
-        return None
+# ============================================================================
+# MCP Tools
+# ============================================================================
 
 @mcp.tool()
 def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
@@ -242,216 +102,85 @@ def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
     
     Args:
         repo_path: Path to the Mutagen src directory.
-    """
-    import time
-    global _CACHED_BM25_RETRIEVER
-    
-    start_time = time.time()
-    
-    # Clear BM25 cache on refresh
-    _CACHED_BM25_RETRIEVER = None
-    logger.info("Cleared BM25 retriever cache")
-    
-    repo_path_obj = Path(repo_path)
-    if not repo_path_obj.exists():
-        return f"Error: Repository path does not exist: {repo_path}"
-
-    logger.info(f"Scanning repository at: {repo_path}")
-    
-    # PRE-FILTER FILES: Build filtered file list BEFORE loading into memory
-    # This dramatically reduces memory usage and I/O for large codebases
-    all_files = []
-    excluded_dirs = {"obj", "bin", "Generated", ".vs", ".git", "Autogenerated"}
-    
-    for root, dirs, files in os.walk(str(repo_path_obj)):
-        # Modify dirs in-place to skip excluded directories (prevents descending into them)
-        dirs[:] = [d for d in dirs if d not in excluded_dirs]
         
-        for file in files:
-            if file.endswith(".cs"):
-                full_path = Path(root) / file
-                # Fast path-based filtering (no file I/O)
-                if not is_generated_file_fast(full_path):
-                    all_files.append(str(full_path))
+    Returns:
+        Status message with statistics
+    """
+    logger.info(f"Starting index refresh for: {repo_path}")
     
-    logger.info(f"Pre-filtered to {len(all_files)} .cs files before loading")
+    # Clear search engine cache
+    search_engine.clear_cache()
     
-    if not all_files:
-        return f"Error: No .cs files found after pre-filtering in {repo_path}"
+    # Perform index refresh
+    result = index_manager.refresh_index(repo_path)
     
-    # Load only the pre-filtered files
-    reader = SimpleDirectoryReader(
-        input_files=all_files,
-        filename_as_id=True
-    )
-    
-    try:
-        all_docs = reader.load_data()
-    except Exception as e:
-        return f"Error loading data: {e}"
-    
-    logger.info(f"Loaded {len(all_docs)} documents. Applying header-based filtering...")
-    
-    # Filter by content (header check) - only for docs that passed path filter
-    filtered_docs = [
-        d for d in all_docs 
-        if not is_header_generated(d.text)
-    ]
-    
-    excluded_count = len(all_docs) - len(filtered_docs)
-    logger.info(f"Filtered down to {len(filtered_docs)} documents. Excluded {excluded_count} files with generated headers.")
-    
-    if not filtered_docs:
-        return "Error: No documents remained after filtering. Check path and filter logic."
+    # Format response
+    if result["success"]:
+        return (
+            f"✅ Index refresh complete.\n"
+            f"- Time taken: {result['elapsed_time']:.2f}s\n"
+            f"- Handwritten files registered: {result['indexed_files']}\n"
+            f"- Excluded generated files: {result['excluded_files']}\n"
+            f"- Storage path: {result['storage_path']}"
+        )
+    else:
+        return f"❌ Index refresh failed: {result.get('error', 'Unknown error')}"
 
-    # Add metadata
-    for doc in filtered_docs:
-        doc.metadata["source"] = "mutagen_handwritten"
-        doc.metadata["indexed_at"] = str(Path(doc.metadata["file_path"]).stat().st_mtime)
-        # Extract additional C# metadata
-        try:
-            doc.metadata.update(extract_metadata(doc.metadata["file_path"], doc.text))
-        except Exception as e:
-            logger.warning(f"Failed to extract metadata for {doc.metadata['file_path']}: {e}")
 
-    # Initialize ChromaDB Collection
-    chroma_collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
-    vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    
-    # Create Index with CodeSplitter for C#-aware chunking
-    # insert_batch_size=SAFE_BATCH_SIZE to stay under ChromaDB limit
-    index = VectorStoreIndex.from_documents(
-        filtered_docs, 
-        storage_context=storage_context,
-        embed_model=embed_model,
-        transformations=transformations_list,  # Use C# code-aware chunking or default
-        show_progress=True,
-        insert_batch_size=SAFE_BATCH_SIZE
-    )
-    
-    # Persist to disk (LlamaIndex metadata)
-    index.storage_context.persist(persist_dir=STORAGE_PATH)
-    
-    elapsed = time.time() - start_time
-    return f"✅ Index refresh complete.\n- Time taken: {elapsed:.2f}s\n- Handwritten files registered: {len(filtered_docs)}\n- Excluded generated files: {len(all_files) - len(filtered_docs) + excluded_count}\n- Storage path: {STORAGE_PATH}"
 @mcp.tool()
 def search_repository(query: str, top_k: int = 10) -> str:
     """
     Searches the Mutagen repository index for relevant code snippets.
     
+    Uses hybrid search combining:
+    - Vector similarity (semantic search)
+    - BM25 keyword matching
+    - Cross-encoder reranking
+    
     Args:
-        query: The search query.
-        top_k: Number of results to return.
+        query: The search query
+        top_k: Number of results to return (default: 10)
+        
+    Returns:
+        Formatted search results with source files
     """
-    try:
-        # Check if collection exists
-        try:
-            chroma_collection = chroma_client.get_collection(COLLECTION_NAME)
-        except ValueError:
-             return "❌ Index does not exist. Please run 'refresh_index' first."
+    logger.info(f"Searching for: {query} (top_k={top_k})")
+    
+    # Perform search
+    result = search_engine.search(query, top_k)
+    
+    # Format and return results
+    return search_engine.format_search_results(result)
 
-        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-        storage_context = StorageContext.from_defaults(
-            vector_store=vector_store,
-            persist_dir=STORAGE_PATH
-        )
-        
-        index = load_index_from_storage(
-            storage_context,
-            embed_model=embed_model
-        )
-        
-        # Query Engine
-        # Using "refine" as requested for better code retrieval accuracy
-        # Query Engine Construction with Hybrid Search and Reranking
-        
-        # 1. BM25 Retriever (Sparse) - with caching for performance
-        retriever_bm25 = get_bm25_retriever(index, chroma_collection, top_k)
-
-        # 2. Vector Retriever (Dense)
-        retriever_vector = index.as_retriever(
-            similarity_top_k=top_k * 2  # Fetch 20 candidates for fusion
-        )
-        
-        # 3. Hybrid Fusion & Query Engine
-        reranker = None
-        try:
-            final_retriever = retriever_vector # Default to vector if hybrid fails
-            
-            if retriever_bm25:
-                # Combines results from both retrievers
-                # Note: This might fail if LLM is missing (default OpenAI)
-                retriever_fusion = QueryFusionRetriever(
-                    [retriever_vector, retriever_bm25],
-                    similarity_top_k=top_k * 2, # Fetch 20 candidates for reranking
-                    num_queries=1,
-                    mode="reciprocal_rank",
-                    use_async=False,
-                    verbose=True
-                )
-                final_retriever = retriever_fusion
-            else:
-                logger.warning("Falling back to Vector Search only (BM25 missing).")
-            
-            # 4. Reranker
-            # Re-scores the fused results to find the absolute best matches
-            reranker = SentenceTransformerRerank(
-                model="BAAI/bge-reranker-base",
-                top_n=top_k
-            )
-
-            # 5. Query Engine
-            query_engine = index.as_query_engine(
-                retriever=final_retriever,
-                node_postprocessors=[reranker],
-                response_mode="refine" 
-            )
-            response = query_engine.query(query)
-            response_text = str(response)
-            source_nodes = response.source_nodes
-        except Exception as e:
-            # Fallback if LLM is not configured
-            logger.warning(f"Query failed (likely missing LLM): {e}. Returning retrieval results only.")
-            # Use vector retriever directly as safe fallback to avoid QueryFusionRetriever LLM dependency
-            source_nodes = retriever_vector.retrieve(query)
-            # Apply reranker manually if we fell back to retriever
-            if reranker:
-                source_nodes = reranker.postprocess_nodes(source_nodes, query_bundle=QueryBundle(query))
-            response_text = "⚠️ LLM not configured or failed. Showing retrieved documents only."
-        
-        # Append source files with more details
-        sources_list = []
-        for node in source_nodes:
-            # Handle NodeWithScore or TextNode
-            # If it's NodeWithScore, get node
-            n = node.node if hasattr(node, 'node') else node
-            score = f"{node.score:.4f}" if hasattr(node, 'score') and node.score is not None else "N/A"
-            
-            file_path = n.metadata.get('file_path', 'Unknown')
-            types = n.metadata.get('defined_types', '')
-            sources_list.append(f"- {file_path} (Score: {score}) {f'[{types}]' if types else ''}")
-            
-        sources = "\n".join(sources_list)
-        
-        return f"{response_text}\n\n📂 Source Files:\n{sources}"
-        
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return f"❌ Error during search: {e}"
 
 @mcp.tool()
 def get_index_stats() -> str:
-    """Returns statistics about the current index."""
+    """
+    Returns statistics about the current index.
+    
+    Returns:
+        Index statistics including document count and storage info
+    """
     try:
         chroma_collection = chroma_client.get_collection(COLLECTION_NAME)
         count = chroma_collection.count()
-        return f"📊 Index Statistics\n- Total Documents: {count}\n- Collection Name: {COLLECTION_NAME}\n- Storage Path: {STORAGE_PATH}"
+        return (
+            f"📊 Index Statistics\n"
+            f"- Total Documents: {count}\n"
+            f"- Collection Name: {COLLECTION_NAME}\n"
+            f"- Storage Path: {STORAGE_PATH}"
+        )
     except Exception as e:
-        return f"Failed to get stats: {str(e)}"
+        return f"❌ Failed to get stats: {str(e)}"
+
+
+# ============================================================================
+# Main Entry Point
+# ============================================================================
 
 if __name__ == "__main__":
     try:
+        logger.info("Starting Mutagen RAG MCP Server...")
         mcp.run()
     except asyncio.CancelledError:
         logger.info("Shutdown requested (CancelledError). Exiting cleanly.")
