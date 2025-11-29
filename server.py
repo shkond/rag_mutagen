@@ -10,6 +10,7 @@ Refactored for improved maintainability and testability.
 """
 import asyncio
 from pathlib import Path
+from typing import Union, List
 
 from fastmcp import FastMCP
 from llama_index.core import Settings
@@ -96,35 +97,55 @@ search_engine = HybridSearchEngine(
 # ============================================================================
 
 @mcp.tool()
-def refresh_index(repo_paths: str = MUTAGEN_REPO_PATH) -> str:
+def refresh_index(
+    repo_path: Union[str, List[str], None] = None,
+    repo_paths: Union[str, List[str], None] = None
+) -> str:
     """
     Mutagenリポジトリ（複数可）をスキャンしてベクトルインデックスを再構築
     自動生成ファイルをフィルタリングし、手書きコードのみをインデックス化します。
 
     Args:
-        repo_paths: リポジトリパス。単一または複数のパスを指定可能。
-                   - 単一パス: "./Mutagen/Mutagen.Bethesda.Core"
-                   - カンマ区切り: "path1,path2,path3"
-                   - 改行区切り: "path1\npath2\npath3"
+        repo_path: リポジトリパス（単数形パラメータ名、AIクライアント互換用）
+        repo_paths: リポジトリパス（複数形パラメータ名、従来互換用）
+        
+        どちらか一方を指定してください。両方指定された場合はrepo_pathsが優先されます。
+        
+        指定可能な形式:
+        - 単一パス (str): "./Mutagen/Mutagen.Bethesda.Core"
+        - カンマ区切り (str): "path1,path2,path3"
+        - 改行区切り (str): "path1\\npath2\\npath3"
+        - リスト (List[str]): ["path1", "path2", "path3"]
 
     Returns:
         インデックス作成結果のサマリー（処理時間、ファイル数、リポジトリ別統計）
     """
-    logger.info(f"Starting index refresh for: {repo_paths}")
+    # Determine which parameter to use (repo_paths takes precedence for backward compatibility)
+    paths_input = repo_paths if repo_paths is not None else repo_path
+    
+    # If neither is provided, use default
+    if paths_input is None:
+        paths_input = MUTAGEN_REPO_PATH
+    
+    # Convert list to comma-separated string if needed
+    if isinstance(paths_input, list):
+        paths_input = ",".join(paths_input)
+    
+    logger.info(f"Starting index refresh for: {paths_input}")
     
     # Clear search engine cache
     search_engine.clear_cache()
     
     # Perform index refresh
-    result = index_manager.refresh_index(repo_paths)
+    result = index_manager.refresh_index(paths_input)
     
     # Format response
     if result["success"]:
         # Per-repository statistics
         stats_lines = []
         if "path_stats" in result:
-            for repo_path, count in result["path_stats"].items():
-                repo_name = Path(repo_path).name
+            for repo_path_item, count in result["path_stats"].items():
+                repo_name = Path(repo_path_item).name
                 stats_lines.append(f"  • {repo_name}: {count} files")
         
         stats_summary = "\n".join(stats_lines) if stats_lines else "  (no details available)"
@@ -145,6 +166,7 @@ def refresh_index(repo_paths: str = MUTAGEN_REPO_PATH) -> str:
 💾 Storage path: {result['storage_path']}"""
     else:
         return f"❌ Index refresh failed: {result.get('error', 'Unknown error')}"
+
 
 
 @mcp.tool()
