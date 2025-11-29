@@ -144,12 +144,17 @@ class IndexManager:
         
         return all_docs
     
-    def filter_and_add_metadata(self, documents: List[Document]) -> List[Document]:
+    def filter_and_add_metadata(
+        self,
+        documents: List[Document],
+        paths_list: List[str] = None
+    ) -> List[Document]:
         """
-        Filter documents by content and add metadata.
+        Filter documents by content and add metadata (including source_repo).
         
         Args:
             documents: List of Document objects
+            paths_list: Optional list of repository paths (for source_repo metadata)
             
         Returns:
             List of filtered documents with metadata
@@ -167,9 +172,23 @@ class IndexManager:
         
         # Add metadata to each document
         for doc in filtered_docs:
+            file_path = Path(doc.metadata["file_path"])
+            
+            # Determine source repository if paths_list is provided
+            doc.metadata["source_repo"] = "unknown"
+            if paths_list:
+                for repo_path in paths_list:
+                    repo_path_resolved = Path(repo_path).resolve()
+                    try:
+                        file_path.resolve().relative_to(repo_path_resolved)
+                        doc.metadata["source_repo"] = repo_path_resolved.name
+                        break
+                    except ValueError:
+                        continue
+            
             # Basic metadata
             doc.metadata["source"] = "mutagen_handwritten"
-            doc.metadata["indexed_at"] = str(Path(doc.metadata["file_path"]).stat().st_mtime)
+            doc.metadata["indexed_at"] = str(file_path.stat().st_mtime)
             
             # Extract C# metadata
             try:
@@ -183,6 +202,7 @@ class IndexManager:
                     f"Failed to extract metadata for {doc.metadata.get('file_path', 'unknown')}: {e}"
                 )
         
+        logger.info(f"Added metadata to {len(filtered_docs)} documents")
         return filtered_docs
     
     def build_index(self, documents: List[Document]) -> VectorStoreIndex:
@@ -224,19 +244,24 @@ class IndexManager:
         index.storage_context.persist(persist_dir=self.storage_path)
         logger.info(f"Index persisted to {self.storage_path}")
     
-    def refresh_index(self, repo_path: str) -> Dict[str, Any]:
+    def refresh_index(self, repo_paths: str) -> Dict[str, Any]:
         """
-        Complete index refresh workflow.
+        Complete index refresh workflow for single or multiple repositories.
         
         Orchestrates all steps:
-        1. Scan and filter files
-        2. Load documents
-        3. Filter by content and add metadata
-        4. Build index
-        5. Persist to disk
+        1. Parse and validate paths
+        2. Scan and filter files from all paths
+        3. Load documents
+        4. Filter by content and add metadata (including source_repo)
+        5. Build index
+        6. Persist to disk
         
         Args:
-            repo_path: Path to the repository
+            repo_paths: Single path or multiple paths separated by comma or newline.
+                       Examples:
+                       - Single: "./Mutagen/Mutagen.Bethesda.Core"
+                       - Comma: "path1,path2,path3"
+                       - Newline: "path1\npath2\npath3"
             
         Returns:
             Dictionary with statistics:
@@ -246,27 +271,67 @@ class IndexManager:
             - indexed_files: int
             - excluded_files: int
             - storage_path: str
+            - path_stats: dict (per-repository file counts)
+            - num_repos: int (number of successfully processed repos)
             - error: str (if failed)
         """
         start_time = time.time()
         
         try:
-            # Step 1: Scan and filter files
-            file_paths = self.scan_and_filter_files(repo_path)
-            total_files = len(file_paths)
+            # Parse paths (support single, comma-separated, newline-separated)
+            if '\n' in repo_paths:
+                paths_list = [p.strip() for p in repo_paths.split('\n') if p.strip()]
+            elif ',' in repo_paths:
+                paths_list = [p.strip() for p in repo_paths.split(',') if p.strip()]
+            else:
+                paths_list = [repo_paths.strip()]
             
-            # Step 2: Load documents
-            documents = self.load_documents(file_paths)
+            # Remove empty paths
+            paths_list = [p for p in paths_list if p]
             
-            # Step 3: Filter by content and add metadata
-            filtered_docs = self.filter_and_add_metadata(documents)
+            if not paths_list:
+                raise ValueError("No valid paths provided")
+            
+            logger.info(f"Processing {len(paths_list)} repository path(s)")
+            
+            # Step 1-2: Scan all paths and collect files
+            all_file_paths = []
+            path_stats = {}  # Track files per repository
+            
+            for repo_path in paths_list:
+                repo_path_obj = Path(repo_path)
+                
+                if not repo_path_obj.exists():
+                    logger.warning(f"Path does not exist, skipping: {repo_path}")
+                    path_stats[repo_path] = 0
+                    continue
+                
+                logger.info(f"Scanning repository at: {repo_path}")
+                
+                # Scan files for this path
+                file_paths = self.file_filterer.scan_files(repo_path_obj, extension=".cs")
+                all_file_paths.extend(file_paths)
+                path_stats[repo_path] = len(file_paths)
+                logger.info(f"  → Found {len(file_paths)} .cs files in {repo_path}")
+            
+            if not all_file_paths:
+                raise ValueError("No .cs files found in any of the specified paths after filtering")
+            
+            total_files = len(all_file_paths)
+            logger.info(f"Total pre-filtered files across all paths: {total_files}")
+            
+            # Step 3: Load documents
+            documents = self.load_documents(all_file_paths)
+            
+            # Step 4: Filter by content and add metadata (including source_repo)
+            filtered_docs = self.filter_and_add_metadata(documents, paths_list)
             indexed_files = len(filtered_docs)
             excluded_files = total_files - indexed_files + (len(documents) - indexed_files)
             
-            # Step 4: Build index
+            # Step 5: Build index
             index = self.build_index(filtered_docs)
             
-            # Step 5: Persist to disk
+            # Step 6: Persist to disk
             self.persist_index(index)
             
             elapsed_time = time.time() - start_time
@@ -277,7 +342,9 @@ class IndexManager:
                 "total_files": total_files,
                 "indexed_files": indexed_files,
                 "excluded_files": excluded_files,
-                "storage_path": self.storage_path
+                "storage_path": self.storage_path,
+                "path_stats": path_stats,  # New: per-repository statistics
+                "num_repos": len([v for v in path_stats.values() if v > 0])
             }
         
         except Exception as e:

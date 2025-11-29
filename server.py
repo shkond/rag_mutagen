@@ -9,6 +9,7 @@ Provides semantic code search over the Mutagen codebase using:
 Refactored for improved maintainability and testability.
 """
 import asyncio
+from pathlib import Path
 
 from fastmcp import FastMCP
 from llama_index.core import Settings
@@ -95,34 +96,53 @@ search_engine = HybridSearchEngine(
 # ============================================================================
 
 @mcp.tool()
-def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
+def refresh_index(repo_paths: str = MUTAGEN_REPO_PATH) -> str:
     """
-    Scans the Mutagen repository and rebuilds the vector index.
-    Filters out auto-generated files.
-    
+    Mutagenリポジトリ（複数可）をスキャンしてベクトルインデックスを再構築
+    自動生成ファイルをフィルタリングし、手書きコードのみをインデックス化します。
+
     Args:
-        repo_path: Path to the Mutagen src directory.
-        
+        repo_paths: リポジトリパス。単一または複数のパスを指定可能。
+                   - 単一パス: "./Mutagen/Mutagen.Bethesda.Core"
+                   - カンマ区切り: "path1,path2,path3"
+                   - 改行区切り: "path1\npath2\npath3"
+
     Returns:
-        Status message with statistics
+        インデックス作成結果のサマリー（処理時間、ファイル数、リポジトリ別統計）
     """
-    logger.info(f"Starting index refresh for: {repo_path}")
+    logger.info(f"Starting index refresh for: {repo_paths}")
     
     # Clear search engine cache
     search_engine.clear_cache()
     
     # Perform index refresh
-    result = index_manager.refresh_index(repo_path)
+    result = index_manager.refresh_index(repo_paths)
     
     # Format response
     if result["success"]:
-        return (
-            f"✅ Index refresh complete.\n"
-            f"- Time taken: {result['elapsed_time']:.2f}s\n"
-            f"- Handwritten files registered: {result['indexed_files']}\n"
-            f"- Excluded generated files: {result['excluded_files']}\n"
-            f"- Storage path: {result['storage_path']}"
-        )
+        # Per-repository statistics
+        stats_lines = []
+        if "path_stats" in result:
+            for repo_path, count in result["path_stats"].items():
+                repo_name = Path(repo_path).name
+                stats_lines.append(f"  • {repo_name}: {count} files")
+        
+        stats_summary = "\n".join(stats_lines) if stats_lines else "  (no details available)"
+        
+        num_repos = result.get("num_repos", 1)
+        total_repos = len(result.get("path_stats", {}))
+        
+        return f"""✅ Index refresh complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏱️  Time taken: {result['elapsed_time']:.2f}s
+📄 Total handwritten files indexed: {result['indexed_files']}
+🚫 Total excluded files: {result['excluded_files']}
+📦 Repositories processed: {num_repos}/{total_repos}
+
+📊 Per-repository statistics:
+{stats_summary}
+
+💾 Storage path: {result['storage_path']}"""
     else:
         return f"❌ Index refresh failed: {result.get('error', 'Unknown error')}"
 
