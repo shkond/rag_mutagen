@@ -155,7 +155,7 @@ def is_header_generated(text: str) -> bool:
 
 def extract_metadata(file_path: str, content: str) -> dict:
     """
-    Extracts C# specific metadata (namespace, class, etc.)
+    Extracts C# specific metadata (namespace, class, method names, etc.)
     """
     metadata = {}
     
@@ -176,8 +176,63 @@ def extract_metadata(file_path: str, content: str) -> dict:
         if len(joined_types) > 500:
             joined_types = joined_types[:497] + "..."
         metadata["defined_types"] = joined_types
+    
+    # Extract Method Names (public methods for BM25 keyword matching)
+    # Pattern matches: public [modifiers] ReturnType MethodName(
+    method_pattern = r'public\s+(?:static\s+|virtual\s+|override\s+|async\s+)?[\w<>\[\]]+\s+([\w]+)\s*\('
+    methods = re.findall(method_pattern, content)
+    
+    if methods:
+        # Remove duplicates and limit size to avoid metadata overflow
+        unique_methods = list(set(methods))
+        joined_methods = ", ".join(unique_methods)
+        if len(joined_methods) > 500:
+            joined_methods = joined_methods[:497] + "..."
+        metadata["methods"] = joined_methods
         
     return metadata
+
+def get_bm25_retriever(index, chroma_collection, top_k: int):
+    """
+    Get or build BM25 retriever with caching.
+    Cached retriever is reused across searches until index is refreshed.
+    """
+    global _CACHED_BM25_RETRIEVER
+    
+    if _CACHED_BM25_RETRIEVER is not None:
+        logger.info("Using cached BM25 retriever")
+        return _CACHED_BM25_RETRIEVER
+    
+    # Build BM25 retriever
+    logger.info("Building new BM25 retriever...")
+    try:
+        nodes = list(index.docstore.docs.values())
+        if not nodes:
+            logger.info("Docstore empty, fetching nodes from ChromaDB for BM25...")
+            data = chroma_collection.get()
+            if data and data['documents']:
+                for i, text in enumerate(data['documents']):
+                    node = TextNode(
+                        text=text, 
+                        id_=data['ids'][i], 
+                        metadata=data['metadatas'][i] if data['metadatas'] else {}
+                    )
+                    nodes.append(node)
+        
+        logger.info(f"Building BM25 index from {len(nodes)} nodes...")
+        if nodes:
+            _CACHED_BM25_RETRIEVER = BM25Retriever.from_defaults(
+                nodes=nodes,
+                similarity_top_k=top_k * 3
+            )
+            logger.info("BM25 retriever cached successfully")
+            return _CACHED_BM25_RETRIEVER
+        else:
+            logger.warning("No nodes found for BM25.")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to initialize BM25Retriever: {e}")
+        return None
 
 @mcp.tool()
 def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
@@ -270,7 +325,7 @@ def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
         filtered_docs, 
         storage_context=storage_context,
         embed_model=embed_model,
-        transformations=[code_splitter],  # Use C# code-aware chunking
+        transformations=transformations_list,  # Use C# code-aware chunking or default
         show_progress=True,
         insert_batch_size=SAFE_BATCH_SIZE
     )
@@ -281,7 +336,7 @@ def refresh_index(repo_path: str = MUTAGEN_REPO_PATH) -> str:
     elapsed = time.time() - start_time
     return f"✅ Index refresh complete.\n- Time taken: {elapsed:.2f}s\n- Handwritten files registered: {len(filtered_docs)}\n- Excluded generated files: {len(all_files) - len(filtered_docs) + excluded_count}\n- Storage path: {STORAGE_PATH}"
 @mcp.tool()
-def search_repository(query: str, top_k: int = 5) -> str:
+def search_repository(query: str, top_k: int = 10) -> str:
     """
     Searches the Mutagen repository index for relevant code snippets.
     
@@ -316,7 +371,7 @@ def search_repository(query: str, top_k: int = 5) -> str:
 
         # 2. Vector Retriever (Dense)
         retriever_vector = index.as_retriever(
-            similarity_top_k=top_k * 3
+            similarity_top_k=top_k * 2  # Fetch 20 candidates for fusion
         )
         
         # 3. Hybrid Fusion & Query Engine
@@ -329,7 +384,7 @@ def search_repository(query: str, top_k: int = 5) -> str:
                 # Note: This might fail if LLM is missing (default OpenAI)
                 retriever_fusion = QueryFusionRetriever(
                     [retriever_vector, retriever_bm25],
-                    similarity_top_k=top_k * 2, # Candidates for reranking
+                    similarity_top_k=top_k * 2, # Fetch 20 candidates for reranking
                     num_queries=1,
                     mode="reciprocal_rank",
                     use_async=False,
